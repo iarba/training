@@ -5,23 +5,72 @@ const rl = readline.createInterface({
     output: process.stdout
 });
 const ClosestToSoftwire = '490008660N';
-const ImperialCode = 'sw72az';
+const SoftwireCode = 'NW5 1TL';
+
+function nop(x){};
 
 function getByStopId(stopId)
 {
-    request('https://api.tfl.gov.uk/StopPoint/' + stopId + '/Arrivals',parseByStopId);
+    new Promise((resolve, reject) => {
+        request('https://api.tfl.gov.uk/StopPoint/' + stopId + '/Arrivals', 
+            function parseByStopId(err, status, body){
+            if(err){
+                reject(err);
+            }
+            if(status.statusCode !== 200){
+                reject("Unexpected status code:" + status.statusCode);
+            }
+            data = JSON.parse(body);
+            var busList = [];
+            for(var entryId in data){
+                entry = data[entryId];
+                bus = new Bus(entry.lineId, entry.towards, entry.timeToStation, entry.destinationName);
+                busList.push(bus);
+            }
+            busList.id = stopId;
+            resolve(busList);
+        });
+    }).then(printBusses).catch(err => {console.log(err);});
 }
-//-------------------------------------------test
-//request('https://api.postcodes.io/postcodes/' + postCode, parseByPostCode)
-//-------------------------------------------test
+
 function getByPostId(postCode){
-    request('https://api.postcodes.io/postcodes/' + postCode, parseByPostCode)
+    new Promise((resolve, reject) => {
+        request('https://api.postcodes.io/postcodes/' + postCode,
+        function parseByPostCode(err, status, body){
+            if(err){
+                reject(err)
+            }
+            if(status.statusCode !== 200){
+                reject('bad query: ' + status.statusCode);
+                return;
+            }
+            data = JSON.parse(body).result;
+            location = new Location(data.longitude,data.latitude);
+            resolve(getByLocation(location));
+        });
+    }).then(nop).catch(err => {console.log(err);});
 }
 
 function getByLocation(location){
     rad = 300;
-    request("https://api.tfl.gov.uk/StopPoint?stopTypes=NaptanBusCoachStation%2CNaptanBusWayPoint%2CNaptanPrivateBusCoachTram%2C%20NaptanPublicBusCoachTram&radius=" + rad + "&modes=bus&lat=" + location.latitude + "&lon=" + location.longitude, parseByLocation);
-
+    new Promise((resolve, reject) => {
+        request("https://api.tfl.gov.uk/StopPoint?stopTypes=NaptanBusCoachStation%2CNaptanBusWayPoint%2CNaptanPrivateBusCoachTram%2C%20NaptanPublicBusCoachTram&radius=" + rad + "&modes=bus&lat=" + location.latitude + "&lon=" + location.longitude, 
+        function parseByLocation(err, status, body){
+            if(err){
+                reject(err);
+            }
+            if(status.statusCode !== 200){
+                reject("bad query: " + status.statusCode);
+            }
+            data = JSON.parse(body);
+            data.stopPoints.sort(function(a,b){
+                return a.distance - b.distance;
+            });
+            getByStopId(data.stopPoints[0].id);
+            getByStopId(data.stopPoints[1].id);
+            resolve(42);
+        });
+    }).then(nop).catch(err => {console.log(err);});
 }
 
 function interpretLine(line){
@@ -38,8 +87,8 @@ function interpretLine(line){
                 case 'STOP':
                     action = getByStopId;
                     break;
-                case 'IMPERIAL':
-                    argument = ImperialCode;
+                case 'COMPANY':
+                    argument = SoftwireCode;
                 case 'POST':
                     action = getByPostId;
                     break;
@@ -59,6 +108,7 @@ function interpretLine(line){
 }
 
 function printBusses(list){
+    console.log("Buses arriving at station " + list.id);
     list.sort(Bus.comparator);
     for(var busId in list){
         if(busId >= 5) {
@@ -69,74 +119,20 @@ function printBusses(list){
     }
 }
 
-function parseByStopId(err, status, body){
-    if(err){
-        console.log(err);
-        return;
-    }
-    if(status.statusCode !== 200){
-        console.log('bad query: ',status.statusCode);
-        return;
-    }
-    data = JSON.parse(body);
-    var busList = [];
-    for(var entryId in data){
-        entry = data[entryId];
-        bus = new Bus(entry.towards, entry.timeToStation, entry.destinationName);
-        busList.push(bus);
-    }
-
-    printBusses(busList);
-}
-
-function parseByPostCode(err, status, body){
-    if(err){
-        console.log(err);
-        return;
-    }
-    if(status.statusCode !== 200){
-        console.log('bad query: ',status.statusCode);
-        return;
-    }
-
-    data = JSON.parse(body).result;
-    location = new Location(data.longitude,data.latitude);
-    getByLocation(location);
- }
-
-function parseByLocation(err, status, body){
-    if(err){
-        console.log(err);
-        return;
-    }
-    if(status.statusCode !== 200){
-        console.log('bad query: ',status.statusCode);
-        return;
-    }
-    data = JSON.parse(body);
-    data.stopPoints.sort(function(a,b){
-        return a.distance - b.distance;
-    });
-    console.log("From stop: ",data.stopPoints[0].id);
-    getByStopId(data.stopPoints[0].id);
-    console.log("From stop: ",data.stopPoints[1].id);
-    getByStopId(data.stopPoints[1].id);
-}
-
-
 function secToMin(seconds){
     return (seconds / 60).toFixed(2)
 }
 
 class Bus {
-    constructor(route, timeToArrival, destination){
+    constructor(id, route, timeToArrival, destination){
+        this.id = id;
         this.route = route;
         this.timeToArrival = timeToArrival;
         this.destination = destination;
     }
 
     toString(){
-        return "Bus towards " + this.destination + " via " + this.route + " expected to arrive in " + secToMin(this.timeToArrival) + " minutes.";
+        return "Bus [" + this.id + "] towards " + this.destination + " via " + this.route + " expected to arrive in " + secToMin(this.timeToArrival) + " minutes.";
     }
 
     static comparator(bus1, bus2){
