@@ -1,6 +1,7 @@
 const request = require('request');
 const readline = require('readline');
 const express = require("express");
+const fs = require("fs");
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -110,14 +111,16 @@ function interpretLine(line){
 }
 
 function printBusses(list){
-    console.log("Buses arriving at station " + list.id);
+    //console.log("Buses arriving at station " + list.id);
+    fs.appendFileSync("page.txt", "Buses arriving at station " + list.id + '<br>' , "UTF-8");
     list.sort(Bus.comparator);
     for(var busId in list){
         if(busId >= 5) {
             break;
         }
         bus = list[busId];
-        console.log(bus.toString());
+        //console.log(bus.toString());
+        fs.appendFileSync("page.txt", bus.toString() + '<br>' , "UTF-8");
     }
 }
 
@@ -152,7 +155,7 @@ class Location {
 var server;
 
 function main(){
-    var i = 0;
+    
     var app = express();
     app.get('/', function (req, res){
         console.log("redirecting");
@@ -166,22 +169,31 @@ function main(){
     app.get('/index.html', function (req, res){
         response = "";
         code = false;
-        if(req.query.postcode != undefined)
-        {
-            code = req.query.postcode;
-            getByPostId(req.query.postcode, true);
-        }
-        response += "<!DOCTYPE html>";
-        response += "<html><head><title>TFL Bus finder based on postcode?</title></head>";
-        response += "<body><p>please input post code</p>";
-        response += "<form action=\"/index.html\">";
-        response += "<input type=\"text\" name=\"postcode\" value=\"" + SoftwireCode + "\">";
-        response += "<input type=\"submit\" value=\"Submit\">";
-        if(code){
-            response += "<p>last request for " + code + ":</p>"; 
-        }
-        response += "</body></html>";
-        res.send(response);
+        var p = new Promise((resolve, reject) => {
+            if(req.query.postcode != undefined){
+                code = req.query.postcode;
+                getByPostId(req.query.postcode, true); 
+            }
+            resolve(0);
+        });
+        p.then((val) =>{
+            outputDone = false;
+            var foo = fs.readFileSync('page.txt', 'UTF-8');
+            fs.unlink('page.txt');
+            response += "<!DOCTYPE html>";
+            response += "<html><head><title>TFL Bus finder based on postcode?</title></head>";
+            response += "<body><p>please input post code</p>";
+            response += "<form action=\"/index.html\">";
+            response += "<input type=\"text\" name=\"postcode\" value=\"" + SoftwireCode + "\">";
+            response += "<input type=\"submit\" value=\"Submit\">";
+            if(code){
+                response += "<p>last request for: " + code + "</p>"; 
+                response += "<p>" + foo + "</p>";
+            }
+            response += "</body></html>";
+            res.send(response);
+        }).catch((err) => console.log("rejected: ", err));
+    
     });
     server = app.listen(3000, function () {
         var host = server.address().address;
