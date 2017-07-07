@@ -8,12 +8,13 @@ const ClosestToSoftwire = '490008660N';
 
 function getByStopId(stopId)
 {
-    request('https://api.tfl.gov.uk/StopPoint/' + stopId + '/Arrivals',parse);
+    request('https://api.tfl.gov.uk/StopPoint/' + stopId + '/Arrivals',parseByStopId);
 }
-
-function getByPostId(stopId)
-{
-    console.log("Not implemented yet!");
+//-------------------------------------------test
+//request('https://api.postcodes.io/postcodes/' + postCode, parseByPostCode)
+//-------------------------------------------test
+function getByPostId(postCode){
+    request('https://api.postcodes.io/postcodes/' + postCode, parseByPostCode)
 }
 
 function interpretLine(line){
@@ -59,7 +60,7 @@ function printBusses(list){
     }
 }
 
-function parse(err, status, body){
+function parseByStopId(err, status, body){
     if(err){
         console.log(err);
         return;
@@ -77,6 +78,21 @@ function parse(err, status, body){
     }
 
     printBusses(busList);
+}
+
+function parseByPostCode(err, status, body){
+    if(err){
+        console.log(err);
+        return;
+    }
+    if(status.statusCode !== 200){
+        console.log('bad query: ',status.statusCode);
+        return;
+    }
+    //console.log(body);
+    data = JSON.parse(body).result;
+    location = new Location(data.longitude,data.latitude);
+    console.log(location.longitude, '  ', location.latitude);
 }
 
 function secToMin(seconds){
@@ -101,6 +117,13 @@ class Bus {
 
 function main(){
     rl.on('line', interpretLine);
+}
+
+class Location {
+    constructor(longitude, latitude){
+        this.longitude = longitude;
+        this.latitude = latitude;
+    }
 }
 
 main();
