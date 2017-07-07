@@ -17,6 +17,12 @@ function getByPostId(postCode){
     request('https://api.postcodes.io/postcodes/' + postCode, parseByPostCode)
 }
 
+function getByLocation(location){
+    rad = 300;
+    request("https://api.tfl.gov.uk/StopPoint?stopTypes=NaptanBusCoachStation%2CNaptanBusWayPoint%2CNaptanPrivateBusCoachTram%2C%20NaptanPublicBusCoachTram&radius=" + rad + "&modes=bus&lat=" + location.latitude + "&lon=" + location.longitude, parseByLocation);
+
+}
+
 function interpretLine(line){
     tokens = line.split(/ +/);
     key = tokens[0].toUpperCase();
@@ -89,11 +95,25 @@ function parseByPostCode(err, status, body){
         console.log('bad query: ',status.statusCode);
         return;
     }
-    //console.log(body);
+
     data = JSON.parse(body).result;
     location = new Location(data.longitude,data.latitude);
-    console.log(location.longitude, '  ', location.latitude);
+    getByLocation(location);
+ }
+
+function parseByLocation(err, status, body){
+    if(err){
+        console.log(err);
+        return;
+    }
+    if(status.statusCode !== 200){
+        console.log('bad query: ',status.statusCode);
+        return;
+    }
+    data = JSON.parse(body);
+    console.log(data);
 }
+
 
 function secToMin(seconds){
     return (seconds / 60).toFixed(2)
