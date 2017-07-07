@@ -1,6 +1,52 @@
-var request = require('request');
+const request = require('request');
+const readline = require('readline');
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+const ClosestToSoftwire = '490008660N';
 
-request('https://api.tfl.gov.uk/StopPoint/490008660N/Arrivals',parse);
+function getByStopId(stopId)
+{
+    request('https://api.tfl.gov.uk/StopPoint/' + stopId + '/Arrivals',parse);
+}
+
+function getByPostId(stopId)
+{
+    console.log("Not implemented yet!");
+}
+
+function interpretLine(line){
+    tokens = line.split(/ +/);
+    key = tokens[0].toUpperCase();
+    switch (key) {
+        case 'BY':
+            key2 = tokens[1].toUpperCase();
+            argument = tokens[2];
+            action = undefined;
+            switch (key2){
+                case 'SOFTWIRE':
+                    argument = ClosestToSoftwire;
+                case 'STOP':
+                    action = getByStopId;
+                    break;
+                case 'POST':
+                    action = getByPostId;
+                    break;
+                default:
+                    console.log('invalid input');
+            }
+            if(action != undefined){
+                action(argument);
+            }
+            break;
+        case 'EXIT':
+            rl.close();
+            break;
+        default:
+            console.log('invalid input');
+    }
+}
 
 function printBusses(list){
     list.sort(Bus.comparator);
@@ -52,3 +98,9 @@ class Bus {
         return bus1.timeToArrival - bus2.timeToArrival;
     }
 }
+
+function main(){
+    rl.on('line', interpretLine);
+}
+
+main();
