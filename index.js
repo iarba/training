@@ -3,7 +3,8 @@ var request = require('request');
 request('https://api.tfl.gov.uk/StopPoint/490008660N/Arrivals',parse);
 
 function printBusses(list){
-    for(var busId in list){
+    list.sort(Bus.comparator);
+    for(var busId in list){//limit to at most 5
         bus = list[busId];
         console.log(bus.toString());
     }
@@ -42,5 +43,9 @@ class Bus {
 
     toString(){
         return "Bus towards " + this.destination + " via " + this.route + " expected to arrive in " + secToMin(this.timeToArrival) + " minutes.";
+    }
+
+    static comparator(bus1, bus2){
+        return bus1.timeToArrival - bus2.timeToArrival;
     }
 }
