@@ -1,32 +1,26 @@
-class View {
-  constructor(options) {
-    this.model = options.model;
-    this.template = options.template;
-  }
+var request = require('request');
 
-  render() {
-    return _.template(this.template, this.model.toObject());
-  }
+request('https://api.tfl.gov.uk/StopPoint/490008660N/Arrivals',parse);
+
+
+function parse(err, status, body){
+    if(err){
+        console.log(err);
+        return;
+    }
+    if(status.statusCode !== 200){
+        console.log('bad query: ',status.statusCode);
+        return;
+    }
+    data = JSON.parse(body);
+    bus = new Bus(data[0].towards, data[0].timeToStation,data[0].destinationName)
+    console.log(bus);
 }
 
-class Model {
-  constructor(properties) {
-    this.properties = properties;
-  }
-
-  toObject() {
-    return this.properties;
-  }
+class Bus {
+    constructor(route, timeToArrival, destination){
+        this.route = route;
+        this.timeToArrival = timeToArrival;
+        this.destination = destination;
+    }
 }
-
-var jack = new Model({
-  name: 'jack'
-});
-
-var view = new View({
-  model: jack,
-  template: 'Hello, <%= name %>'
-});
-
-console.log(view.render());
-
