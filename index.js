@@ -5,6 +5,7 @@ const rl = readline.createInterface({
     output: process.stdout
 });
 const ClosestToSoftwire = '490008660N';
+const ImperialCode = 'sw72az';
 
 function getByStopId(stopId)
 {
@@ -37,6 +38,8 @@ function interpretLine(line){
                 case 'STOP':
                     action = getByStopId;
                     break;
+                case 'IMPERIAL':
+                    argument = ImperialCode;
                 case 'POST':
                     action = getByPostId;
                     break;
@@ -111,7 +114,13 @@ function parseByLocation(err, status, body){
         return;
     }
     data = JSON.parse(body);
-    console.log(data);
+    data.stopPoints.sort(function(a,b){
+        return a.distance - b.distance;
+    });
+    console.log("From stop: ",data.stopPoints[0].id);
+    getByStopId(data.stopPoints[0].id);
+    console.log("From stop: ",data.stopPoints[1].id);
+    getByStopId(data.stopPoints[1].id);
 }
 
 
