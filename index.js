@@ -2,6 +2,10 @@ var request = require('request');
 
 request('https://api.tfl.gov.uk/StopPoint/490008660N/Arrivals',parse);
 
+function printBusses(list)
+{
+    console.log(list);
+}
 
 function parse(err, status, body){
     if(err){
@@ -13,8 +17,15 @@ function parse(err, status, body){
         return;
     }
     data = JSON.parse(body);
-    bus = new Bus(data[0].towards, data[0].timeToStation,data[0].destinationName)
-    console.log(bus);
+    var busList = [];
+    for(var entryId in data)
+    {
+        entry = data[entryId];
+        bus = new Bus(entry.towards, entry.timeToStation, entry.destinationName);
+        busList.push(bus);
+    }
+
+    printBusses(busList);
 }
 
 class Bus {
