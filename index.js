@@ -4,7 +4,10 @@ request('https://api.tfl.gov.uk/StopPoint/490008660N/Arrivals',parse);
 
 function printBusses(list){
     list.sort(Bus.comparator);
-    for(var busId in list){//limit to at most 5
+    for(var busId in list){
+        if(busId >= 5) {
+            break;
+        }
         bus = list[busId];
         console.log(bus.toString());
     }
