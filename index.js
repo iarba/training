@@ -1,5 +1,6 @@
 const request = require('request');
 const readline = require('readline');
+const express = require("express");
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -7,7 +8,7 @@ const rl = readline.createInterface({
 const ClosestToSoftwire = '490008660N';
 const SoftwireCode = 'NW5 1TL';
 
-function nop(x){};
+function nop(x){}
 
 function getByStopId(stopId)
 {
@@ -101,6 +102,7 @@ function interpretLine(line){
             break;
         case 'EXIT':
             rl.close();
+            server.close();
             break;
         default:
             console.log('invalid input');
@@ -140,15 +142,53 @@ class Bus {
     }
 }
 
-function main(){
-    rl.on('line', interpretLine);
-}
-
 class Location {
     constructor(longitude, latitude){
         this.longitude = longitude;
         this.latitude = latitude;
     }
+}
+
+var server;
+
+function main(){
+    var i = 0;
+    var app = express();
+    app.get('/', function (req, res){
+        console.log("redirecting");
+        extra = "";
+        if(req._parsedUrl.search != null)
+        {
+            extra = req._parsedUrl.search;
+        }
+        res.redirect("/index.html" + extra);
+    });
+    app.get('/index.html', function (req, res){
+        response = "";
+        code = false;
+        if(req.query.postcode != undefined)
+        {
+            code = req.query.postcode;
+            getByPostId(req.query.postcode, true);
+        }
+        response += "<!DOCTYPE html>";
+        response += "<html><head><title>TFL Bus finder based on postcode?</title></head>";
+        response += "<body><p>please input post code</p>";
+        response += "<form action=\"/index.html\">";
+        response += "<input type=\"text\" name=\"postcode\" value=\"" + SoftwireCode + "\">";
+        response += "<input type=\"submit\" value=\"Submit\">";
+        if(code){
+            response += "<p>last request for " + code + ":</p>"; 
+        }
+        response += "</body></html>";
+        res.send(response);
+    });
+    server = app.listen(3000, function () {
+        var host = server.address().address;
+        var port = server.address().port;
+        console.log("Example app listening at http://%s:%s", host, port)
+    });
+    rl.on('line', interpretLine);
 }
 
 main();
