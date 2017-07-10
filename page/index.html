@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<HTML>
+  <HEAD>
+    <script>
+const addr = "http://10.213.2.124:3000";
+
+function printBusses(list, sep){
+  var result = "";
+  if((list.id == 0) || (list.id == undefined)){
+    for(var busListIndex in list){
+      if(busListIndex == "id"){
+        continue;
+      }
+      result += printBusses(list[busListIndex], sep);
+    }
+    return result;
+  }
+  result += "Buses arriving at station " + list.id + ":" + sep;
+  for(var busIndex in list.content){
+    if(busIndex == "id"){
+      continue;
+    }
+    result += printBus(list.content[busIndex]) + sep;
+  }
+  return result; 
+}
+
+function secToMin(time){
+  return (time / 60).toFixed(2);
+}
+
+function printBus(bus){
+  return "Bus [" + bus.id + "] towards " + bus.destination + " via " + bus.route + " expected to arrive in " + secToMin(bus.timeToArrival) + " minutes.";
+}
+
+function query(){
+  var key = document.getElementById("inputField").value;
+  var targetURL = addr + "/postcode?postcode=" + key;
+  var http = new XMLHttpRequest();
+  http.open("GET", targetURL, true);
+  http.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  http.onreadystatechange = function(){
+    if (this.readyState == 4 && this.status == 200) {
+      data = JSON.parse(this.responseText);
+      if(data.status != 200){
+        document.getElementById("resu").innerHTML = data.content;
+        console.log("MISS");
+      } else {
+        document.getElementById("resu").innerHTML = printBusses(data.content, "<br/>");
+        console.log("HIT");
+      }
+    } else {
+      document.getElementById("resu").innerHTML = "BAD!"
+      console.log("error connecting");
+    }
+  };
+  http.send();
+}
+
+    </script>
+    <TITLE>
+      Bus Finder
+    </TITLE>
+  </HEAD>
+  <BODY>
+    <input id="inputField" type="text" value="SW7 2AZ"/>
+    <input id="submitter" type="button" value="Find Busses" onclick="query();"/>
+    <p id="resu">qweqwe</p>
+  </BODY>
+</HTML>
