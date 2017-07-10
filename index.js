@@ -1,6 +1,7 @@
 const request = require('request');
 const readline = require('readline');
 const express = require("express");
+const cors = require("cors");
 const fs = require("fs");
 const rl = readline.createInterface({
     input: process.stdin,
@@ -28,13 +29,12 @@ function getByStopId(stopId)
                 reject("Unexpected status code:" + status.statusCode);
             }
             data = JSON.parse(body);
-            var busList = [];
+            var busList = new BusList(stopId);
             for(var entryId in data){
                 entry = data[entryId];
                 bus = new Bus(entry.lineId, entry.towards, entry.timeToStation, entry.destinationName);
                 busList.push(bus);
             }
-            busList.id = stopId;
             resolve(busList);
         });
     });
@@ -113,7 +113,7 @@ function interpretLine(line){
                     console.log('invalid input');
             }
             if(action != undefined){
-                action(argument).then(busList => console.log(printBusses(busList))).catch(err => console.log(err));
+                action(argument).then(busList => console.log(BusList.printBusses(busList))).catch(err => console.log(err));
             }
             break;
         case 'EXIT':
@@ -125,34 +125,50 @@ function interpretLine(line){
     }
 }
 
-function printBusses(list, sep = NL){
-    if(list.id == 0){
-        result = "";
-        for(var listId in list){
-            if(listId == "id"){
+function secToMin(seconds){
+    return (seconds / 60).toFixed(2)
+}
+
+class BusList {
+    constructor(id){
+        this.id = id;
+        this.content = [];
+    }
+
+    push(value){
+        this.content.push(value);
+    }
+
+    sort(funct){
+        return this.content.sort(funct);
+    }
+
+    static printBusses(list, sep = NL){
+        var result;
+        if(list.id == 0){
+            result = "";
+            for(var listId in list){
+                if(listId == "id"){
+                    continue;
+                }
+                result += BusList.printBusses(list[listId], sep);
+            }
+            return result;
+        }
+        result = "Buses arriving at station " + list.id + sep;
+        list.sort(Bus.comparator);
+        for(var busId in list.content){
+            if(busId == "id"){
                 continue;
             }
-            result += printBusses(list[listId], sep);
+            if(busId >= 5) {
+                break;
+            }
+            bus = list.content[busId];
+            result += bus.toString() + sep;
         }
         return result;
     }
-    result = "Buses arriving at station " + list.id + sep;
-    list.sort(Bus.comparator);
-    for(var busId in list){
-        if(busId == "id"){
-            continue;
-        }
-        if(busId >= 5) {
-            break;
-        }
-        bus = list[busId];
-        result += bus.toString() + sep;
-    }
-    return result;
-}
-
-function secToMin(seconds){
-    return (seconds / 60).toFixed(2)
 }
 
 class Bus {
@@ -181,6 +197,7 @@ class Location {
 
 function main(){
     server = express()
+    .use(cors())
     .get('/', function (req, res){
         console.log("redirecting");
         extra = "";
@@ -194,6 +211,7 @@ function main(){
     .get('/index.html', function (req, res){
         header = "<!DOCTYPE html>";
         header += "<html><head><title>TFL Bus finder based on postcode?</title></head>";
+        
         body = "<body><p>please input post code</p>";
         body += "<form action=\"/index.html\">";
         footer = "</body></html>";
@@ -210,7 +228,7 @@ function main(){
             getByPostId(req.query.postcode)
             .then((val) => {
                 body += "<p>Results for: " + code + "</p>";
-                body += "<p>" + printBusses(val, BR) + "</p>";
+                body += "<p>" + BusList.printBusses(val, BR) + "</p>";
                 res.send(header + body + footer);
             }).catch((err) => {
                 console.log("rejected: ", err); 
@@ -219,12 +237,13 @@ function main(){
         } else{
             res.send(header + body + footer);
         }
+        //setTimeout("location.reload(true);",5000);
     })
     .get("/postcode", function(req, res){
         code = req.query.postcode;
         if(code != undefined){
             if(postRegEx.test(code)){
-                getByPostId(code).then((val) => {res.send(val)});
+                getByPostId(code).then((val) => {res.send(val);});
             }  
         }
     })
