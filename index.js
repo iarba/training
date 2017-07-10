@@ -6,10 +6,12 @@ const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
+const postRegEx = new RegExp("^(([gG][iI][rR] {0,}0[aA]{2})|((([a-pr-uwyzA-PR-UWYZ][a-hk-yA-HK-Y]?[0-9][0-9]?)|(([a-pr-uwyzA-PR-UWYZ][0-9][a-hjkstuwA-HJKSTUW])|([a-pr-uwyzA-PR-UWYZ][a-hk-yA-HK-Y][0-9][abehmnprv-yABEHMNPRV-Y]))) {0,}[0-9][abd-hjlnp-uw-zABD-HJLNP-UW-Z]{2}))$");
 const ClosestToSoftwire = '490008660N';
 const SoftwireCode = 'NW5 1TL';
 const NL = "\n";
 const BR = "<br/>";
+const displayedStops = 2;
 var server;
 
 function nop(x){}
@@ -68,12 +70,22 @@ function getByLocation(location){
                 reject("bad query: " + status.statusCode);
             }
             data = JSON.parse(body);
-            data.stopPoints.sort(function(a,b){
-                return a.distance - b.distance;
-            });
-            var stop1 = getByStopId(data.stopPoints[0].id);
-            var stop2 = getByStopId(data.stopPoints[1].id);
-            Promise.all([stop1, stop2]).then(busListList => {busListList.id = 0; resolve(busListList);})
+
+            if(data.stopPoints.length > 0){
+                var stops = [];
+                data.stopPoints.sort(function(a,b){
+                    return a.distance - b.distance;
+                });
+                for(var i in data.stopPoints){
+                    if(i < displayedStops){
+                        stops.push(getByStopId(data.stopPoints[i].id));
+                    }
+                }
+                Promise.all(stops).then((busListList) => {busListList.id = 0; resolve(busListList);})
+            }else{
+                reject("no bus stops nearby");
+            }
+            
         });
     });
 }
@@ -177,6 +189,7 @@ function main(){
             extra = req._parsedUrl.search;
         }
         res.redirect("/index.html" + extra);
+        
     })
     .get('/index.html', function (req, res){
         header = "<!DOCTYPE html>";
@@ -205,6 +218,14 @@ function main(){
                 res.send(header + body + footer);});
         } else{
             res.send(header + body + footer);
+        }
+    })
+    .get("/postcode", function(req, res){
+        code = req.query.postcode;
+        if(code != undefined){
+            if(postRegEx.test(code)){
+                getByPostId(code).then((val) => {res.send(val)});
+            }  
         }
     })
     .listen(3000, function () {
