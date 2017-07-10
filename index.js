@@ -8,12 +8,15 @@ const rl = readline.createInterface({
 });
 const ClosestToSoftwire = '490008660N';
 const SoftwireCode = 'NW5 1TL';
+const NL = "\n";
+const BR = "<br/>";
+var server;
 
 function nop(x){}
 
 function getByStopId(stopId)
 {
-    new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         request('https://api.tfl.gov.uk/StopPoint/' + stopId + '/Arrivals', 
             function parseByStopId(err, status, body){
             if(err){
@@ -32,11 +35,11 @@ function getByStopId(stopId)
             busList.id = stopId;
             resolve(busList);
         });
-    }).then(printBusses).catch(err => {console.log(err);});
+    });
 }
 
 function getByPostId(postCode){
-    new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         request('https://api.postcodes.io/postcodes/' + postCode,
         function parseByPostCode(err, status, body){
             if(err){
@@ -48,14 +51,14 @@ function getByPostId(postCode){
             }
             data = JSON.parse(body).result;
             location = new Location(data.longitude,data.latitude);
-            resolve(getByLocation(location));
+            getByLocation(location).then((val) => resolve(val)).catch((val) => reject(val));
         });
-    }).then(nop).catch(err => {console.log(err);});
+    });
 }
 
 function getByLocation(location){
     rad = 300;
-    new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         request("https://api.tfl.gov.uk/StopPoint?stopTypes=NaptanBusCoachStation%2CNaptanBusWayPoint%2CNaptanPrivateBusCoachTram%2C%20NaptanPublicBusCoachTram&radius=" + rad + "&modes=bus&lat=" + location.latitude + "&lon=" + location.longitude, 
         function parseByLocation(err, status, body){
             if(err){
@@ -68,11 +71,11 @@ function getByLocation(location){
             data.stopPoints.sort(function(a,b){
                 return a.distance - b.distance;
             });
-            getByStopId(data.stopPoints[0].id);
-            getByStopId(data.stopPoints[1].id);
-            resolve(42);
+            var stop1 = getByStopId(data.stopPoints[0].id);
+            var stop2 = getByStopId(data.stopPoints[1].id);
+            Promise.all([stop1, stop2]).then(busListList => {busListList.id = 0; resolve(busListList);})
         });
-    }).then(nop).catch(err => {console.log(err);});
+    });
 }
 
 function interpretLine(line){
@@ -98,30 +101,42 @@ function interpretLine(line){
                     console.log('invalid input');
             }
             if(action != undefined){
-                action(argument);
+                action(argument).then(busList => console.log(printBusses(busList))).catch(err => console.log(err));
             }
             break;
         case 'EXIT':
-            rl.close();
             server.close();
+            rl.close();
             break;
         default:
             console.log('invalid input');
     }
 }
 
-function printBusses(list){
-    //console.log("Buses arriving at station " + list.id);
-    fs.appendFileSync("page.txt", "Buses arriving at station " + list.id + '<br>' , "UTF-8");
+function printBusses(list, sep = NL){
+    if(list.id == 0){
+        result = "";
+        for(var listId in list){
+            if(listId == "id"){
+                continue;
+            }
+            result += printBusses(list[listId], sep);
+        }
+        return result;
+    }
+    result = "Buses arriving at station " + list.id + sep;
     list.sort(Bus.comparator);
     for(var busId in list){
+        if(busId == "id"){
+            continue;
+        }
         if(busId >= 5) {
             break;
         }
         bus = list[busId];
-        //console.log(bus.toString());
-        fs.appendFileSync("page.txt", bus.toString() + '<br>' , "UTF-8");
+        result += bus.toString() + sep;
     }
+    return result;
 }
 
 function secToMin(seconds){
@@ -152,12 +167,9 @@ class Location {
     }
 }
 
-var server;
-
 function main(){
-    
-    var app = express();
-    app.get('/', function (req, res){
+    server = express()
+    .get('/', function (req, res){
         console.log("redirecting");
         extra = "";
         if(req._parsedUrl.search != null)
@@ -165,37 +177,37 @@ function main(){
             extra = req._parsedUrl.search;
         }
         res.redirect("/index.html" + extra);
-    });
-    app.get('/index.html', function (req, res){
-        response = "";
+    })
+    .get('/index.html', function (req, res){
+        header = "<!DOCTYPE html>";
+        header += "<html><head><title>TFL Bus finder based on postcode?</title></head>";
+        body = "<body><p>please input post code</p>";
+        body += "<form action=\"/index.html\">";
+        footer = "</body></html>";
         code = false;
-        var p = new Promise((resolve, reject) => {
-            if(req.query.postcode != undefined){
-                code = req.query.postcode;
-                getByPostId(req.query.postcode, true); 
-            }
-            resolve(0);
-        });
-        p.then((val) =>{
-            outputDone = false;
-            var foo = fs.readFileSync('page.txt', 'UTF-8');
-            fs.unlink('page.txt');
-            response += "<!DOCTYPE html>";
-            response += "<html><head><title>TFL Bus finder based on postcode?</title></head>";
-            response += "<body><p>please input post code</p>";
-            response += "<form action=\"/index.html\">";
-            response += "<input type=\"text\" name=\"postcode\" value=\"" + SoftwireCode + "\">";
-            response += "<input type=\"submit\" value=\"Submit\">";
-            if(code){
-                response += "<p>last request for: " + code + "</p>"; 
-                response += "<p>" + foo + "</p>";
-            }
-            response += "</body></html>";
-            res.send(response);
-        }).catch((err) => console.log("rejected: ", err));
-    
-    });
-    server = app.listen(3000, function () {
+        toPrint = SoftwireCode;
+        if(req.query.postcode != undefined){
+            code = req.query.postcode;
+            toPrint = code;
+        }
+        body += "<input type=\"text\" name=\"postcode\" value=\"" + toPrint + "\">";
+        body += "<input type=\"submit\" value=\"Submit\">";
+        body += "</form>";
+        if(code){
+            getByPostId(req.query.postcode)
+            .then((val) => {
+                body += "<p>Results for: " + code + "</p>";
+                body += "<p>" + printBusses(val, BR) + "</p>";
+                res.send(header + body + footer);
+            }).catch((err) => {
+                console.log("rejected: ", err); 
+                body += "<p>Error encountered: " + err + "</p>"; 
+                res.send(header + body + footer);});
+        } else{
+            res.send(header + body + footer);
+        }
+    })
+    .listen(3000, function () {
         var host = server.address().address;
         var port = server.address().port;
         console.log("Example app listening at http://%s:%s", host, port)
