@@ -81,7 +81,7 @@ function getByLocation(location){
                         stops.push(getByStopId(data.stopPoints[i].id));
                     }
                 }
-                Promise.all(stops).then((busListList) => {busListList.id = 0; resolve(busListList);})
+                Promise.all(stops).then((busListList) => {busListList.id = 0; resolve(busListList);}).catch(err => reject(err));
             }else{
                 reject("no bus stops nearby");
             }
@@ -195,6 +195,13 @@ class Location {
     }
 }
 
+class StatusContainer {
+    constructor(status, content){
+        this.status = status;
+        this.content = content;
+    }
+}
+
 function main(){
     server = express()
     .use(cors())
@@ -243,8 +250,10 @@ function main(){
         code = req.query.postcode;
         if(code != undefined){
             if(postRegEx.test(code)){
-                getByPostId(code).then((val) => {res.send(val);});
+                getByPostId(code).then((val) => {res.send(new StatusContainer(200,val));}).catch((err) => {res.send(new StatusContainer(400, err))});
             }  
+        } else {
+            res.send(new StatusContainer(400, "Missing request"));
         }
     })
     .listen(3000, function () {
